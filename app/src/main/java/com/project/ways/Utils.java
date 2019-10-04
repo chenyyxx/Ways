@@ -1,5 +1,5 @@
 
-package com.laioffer.matrix;
+package com.project.ways;
 
 import org.apache.commons.codec.binary.Hex;
 

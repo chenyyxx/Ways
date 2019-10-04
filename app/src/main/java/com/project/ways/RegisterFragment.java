@@ -1,7 +1,7 @@
-package com.laioffer.matrix;
+package com.project.ways;
 
 
-import android.content.Intent;
+import android.app.Activity;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
@@ -14,25 +14,23 @@ import android.widget.Toast;
 
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
 
 /**
  * A simple {@link Fragment} subclass.
  */
-public class LoginFragment extends OnBoardingBaseFragment {
-    public static LoginFragment newInstance() {
+public class RegisterFragment extends OnBoardingBaseFragment {
+    public static RegisterFragment newInstance() {
 
         Bundle args = new Bundle();
 
-        LoginFragment fragment = new LoginFragment();
+        RegisterFragment fragment = new RegisterFragment();
         fragment.setArguments(args);
         return fragment;
     }
 
-    public LoginFragment() {
+    public RegisterFragment() {
         // Required empty public constructor
     }
 
@@ -42,24 +40,28 @@ public class LoginFragment extends OnBoardingBaseFragment {
                              Bundle savedInstanceState) {
         // Inflate the layout for this fragment
         View view = super.onCreateView(inflater, container, savedInstanceState);
-        submitButton.setText(getString(R.string.login));
+        submitButton.setText(getString(R.string.register));
 
-        // login the submitButton and register
+        // register the account to firebase
         submitButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 final String username = usernameEditText.getText().toString();
-                final String password = Utils.md5Encryption(passwordEditText.getText().toString());
+                final String password = passwordEditText.getText().toString();
 
                 database.child("user").addListenerForSingleValueEvent(new ValueEventListener() {
                     @Override
                     public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                        if (dataSnapshot.hasChild(username) && (password.equals(dataSnapshot.child(username).child("user_password").getValue()))){
-                            Config.username = username;
-                            startActivity(new Intent(getActivity(), ControlPanel.class));
-                            getActivity().finish();
-                        } else {
-                            Toast.makeText(getActivity(), "Please try to login again", Toast.LENGTH_SHORT).show();
+                        if(dataSnapshot.hasChild(username)){
+                            Toast.makeText(getContext(), "username is already registered, please change one", Toast.LENGTH_LONG).show();
+                        } else if (!username.isEmpty() && !password.isEmpty()){
+                            final User user = new User();
+                            user.setUser_account(username);
+                            user.setUser_password(Utils.md5Encryption(password));
+                            user.setUser_timestamp(System.currentTimeMillis());
+                            database.child("user").child(user.getUser_account()).setValue(user);
+                            Toast.makeText(getContext(), "user has successfully registered", Toast.LENGTH_LONG).show();
+                            goToLogin();
                         }
                     }
 
@@ -70,13 +72,20 @@ public class LoginFragment extends OnBoardingBaseFragment {
                 });
             }
         });
-
         return view;
+
+    }
+    private void goToLogin(){
+        Activity activity = getActivity();
+        if(activity!=null && !activity.isFinishing()){
+            ((OnBoardingActivity)activity).setCurrentPage(0);
+        }
     }
 
     @Override
     protected int getLayout() {
-        return R.layout.fragment_login;
+        return R.layout.fragment_register;
+
     }
 
 }

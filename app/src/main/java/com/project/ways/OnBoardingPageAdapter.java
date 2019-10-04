@@ -1,4 +1,4 @@
-package com.laioffer.matrix;
+package com.project.ways;
 
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;

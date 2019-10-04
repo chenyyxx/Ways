@@ -1,7 +1,7 @@
-package com.laioffer.matrix;
+package com.project.ways;
 
 
-import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
@@ -20,17 +20,17 @@ import com.google.firebase.database.ValueEventListener;
 /**
  * A simple {@link Fragment} subclass.
  */
-public class RegisterFragment extends OnBoardingBaseFragment {
-    public static RegisterFragment newInstance() {
+public class LoginFragment extends OnBoardingBaseFragment {
+    public static LoginFragment newInstance() {
 
         Bundle args = new Bundle();
 
-        RegisterFragment fragment = new RegisterFragment();
+        LoginFragment fragment = new LoginFragment();
         fragment.setArguments(args);
         return fragment;
     }
 
-    public RegisterFragment() {
+    public LoginFragment() {
         // Required empty public constructor
     }
 
@@ -40,28 +40,24 @@ public class RegisterFragment extends OnBoardingBaseFragment {
                              Bundle savedInstanceState) {
         // Inflate the layout for this fragment
         View view = super.onCreateView(inflater, container, savedInstanceState);
-        submitButton.setText(getString(R.string.register));
+        submitButton.setText(getString(R.string.login));
 
-        // register the account to firebase
+        // login the submitButton and register
         submitButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 final String username = usernameEditText.getText().toString();
-                final String password = passwordEditText.getText().toString();
+                final String password = Utils.md5Encryption(passwordEditText.getText().toString());
 
                 database.child("user").addListenerForSingleValueEvent(new ValueEventListener() {
                     @Override
                     public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                        if(dataSnapshot.hasChild(username)){
-                            Toast.makeText(getContext(), "username is already registered, please change one", Toast.LENGTH_LONG).show();
-                        } else if (!username.isEmpty() && !password.isEmpty()){
-                            final User user = new User();
-                            user.setUser_account(username);
-                            user.setUser_password(Utils.md5Encryption(password));
-                            user.setUser_timestamp(System.currentTimeMillis());
-                            database.child("user").child(user.getUser_account()).setValue(user);
-                            Toast.makeText(getContext(), "user has successfully registered", Toast.LENGTH_LONG).show();
-                            goToLogin();
+                        if (dataSnapshot.hasChild(username) && (password.equals(dataSnapshot.child(username).child("user_password").getValue()))){
+                            Config.username = username;
+                            startActivity(new Intent(getActivity(), ControlPanel.class));
+                            getActivity().finish();
+                        } else {
+                            Toast.makeText(getActivity(), "Please try to login again", Toast.LENGTH_SHORT).show();
                         }
                     }
 
@@ -72,20 +68,13 @@ public class RegisterFragment extends OnBoardingBaseFragment {
                 });
             }
         });
-        return view;
 
-    }
-    private void goToLogin(){
-        Activity activity = getActivity();
-        if(activity!=null && !activity.isFinishing()){
-            ((OnBoardingActivity)activity).setCurrentPage(0);
-        }
+        return view;
     }
 
     @Override
     protected int getLayout() {
-        return R.layout.fragment_register;
-
+        return R.layout.fragment_login;
     }
 
 }

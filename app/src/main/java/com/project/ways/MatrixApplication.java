@@ -1,4 +1,4 @@
-package com.laioffer.matrix;
+package com.project.ways;
 
 import android.app.Application;
 

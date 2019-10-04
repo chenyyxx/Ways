@@ -1,4 +1,4 @@
-package com.laioffer.matrix;
+package com.project.ways;
 
 public class Item {
     private int drawable_id;

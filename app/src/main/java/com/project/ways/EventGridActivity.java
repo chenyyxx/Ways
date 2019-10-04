@@ -1,4 +1,4 @@
-package com.laioffer.matrix;
+package com.project.ways;
 
 import androidx.appcompat.app.AppCompatActivity;
 
