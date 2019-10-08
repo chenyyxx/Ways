@@ -1,12 +1,18 @@
 package com.project.ways;
 
 
+import android.Manifest;
+import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.net.Uri;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.Fragment;
 
 import android.os.Environment;
@@ -25,11 +31,20 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MapStyleOptions;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.tasks.Continuation;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
+import com.google.firebase.storage.UploadTask;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -44,6 +59,12 @@ import static android.app.Activity.RESULT_OK;
  */
 public class MainFragment extends Fragment implements OnMapReadyCallback, ReportDialog.DialogCallBack {
     private static final int REQUEST_CAPTURE_IMAGE = 100;
+    private final String path = Environment.getExternalStorageDirectory()+"/temp.png";
+    private static final int REQUEST_EXTERNAL_STORAGE =1;
+    private static String[] PERMISSIONS_STORAGE={
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE
+    };
     private MapView mapView;
     private View view;
     private LocationTracker locationTracker;
@@ -52,6 +73,8 @@ public class MainFragment extends Fragment implements OnMapReadyCallback, Report
     private FloatingActionButton fabFocus;
     private ReportDialog dialog;
     private DatabaseReference database;
+    private FirebaseStorage storage;
+    private StorageReference storageRef;
 
 
     public static MainFragment newInstance() {
@@ -74,6 +97,9 @@ public class MainFragment extends Fragment implements OnMapReadyCallback, Report
         // Inflate the layout for this fragment
         view = inflater.inflate(R.layout.fragment_main, container, false);
         database = FirebaseDatabase.getInstance().getReference();
+        storage = FirebaseStorage.getInstance();
+        storageRef = storage.getReference();
+        verifyStoragePermissions(getActivity());
         return view;
     }
     @Override
@@ -145,9 +171,50 @@ public class MainFragment extends Fragment implements OnMapReadyCallback, Report
                 .fromResource(R.drawable.boy));
         // Add marker to google map
         googleMap.addMarker(marker);
-
+        loadEventInVisibleMap();
 
     }
+
+    // Get Center Coordinate
+    private void loadEventInVisibleMap(){
+        database.child("events").addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                for (DataSnapshot noteDataSnapShot: dataSnapshot.getChildren()){
+                    TrafficEvent event = noteDataSnapShot.getValue(TrafficEvent.class);
+                    double eventLatitude = event.getEvent_latitude();
+                    double eventLongitude = event.getEvent_longitude();
+                    locationTracker.getLocation();
+                    double centerLatitude = locationTracker.getLatitude();
+                    double centerLongitude = locationTracker.getLongitude();
+
+                    int distance = Utils.distanceBetweenTwoLocations(centerLatitude, centerLongitude, eventLatitude, eventLongitude);
+                    if(distance <20){
+                        LatLng latLng = new LatLng(eventLatitude, eventLongitude);
+                        MarkerOptions marker = new MarkerOptions().position(latLng);
+
+                        // changing marker icon
+                        String type = event.getEvent_type();
+                        Bitmap icon = BitmapFactory.decodeResource(getContext().getResources(), Config.trafficMap.get(type));
+
+                        Bitmap resizeBitmap = Utils.getResizedBitmap(icon, 130, 130);
+
+                        marker.icon(BitmapDescriptorFactory.fromBitmap(resizeBitmap));
+
+                        // Adding marker
+                        Marker mker = googleMap.addMarker(marker);
+                        mker.setTag(event);
+                    }
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                // TODO: do something
+            }
+        });
+    }
+
     @Override
     public void onLowMemory() {
         super.onLowMemory();
@@ -196,6 +263,9 @@ public class MainFragment extends Fragment implements OnMapReadyCallback, Report
     @Override
     public void onSubmit(String editString, String event_type) {
         String key = uploadEvent(Config.username, editString, event_type);
+
+        // Upload image and link the image to the corresponding key
+        uploadImage(key);
     }
 
     @Override
@@ -240,6 +310,51 @@ public class MainFragment extends Fragment implements OnMapReadyCallback, Report
                 break;
             }
             default:
+        }
+    }
+
+    // Upload image to cloud storage
+    private void uploadImage(final String key){
+        File file = new File(path);
+        if(!file.exists()){
+            dialog.dismiss();
+            loadEventInVisibleMap();
+            return;
+        }
+        Uri uri = Uri.fromFile(file);
+        final StorageReference imgRef = storageRef.child("images/"+uri.getLastPathSegment()+"_"+System.currentTimeMillis());
+        imgRef.putFile(uri).continueWithTask(new Continuation<UploadTask.TaskSnapshot, Task<Uri>>() {
+            @Override
+            public Task<Uri> then(@NonNull Task<UploadTask.TaskSnapshot> task) throws Exception {
+                if(!task.isSuccessful()){
+                    throw task.getException();
+                }
+                return imgRef.getDownloadUrl();
+            }
+        }).addOnCompleteListener(new OnCompleteListener<Uri>() {
+            @Override
+            public void onComplete(@NonNull Task<Uri> task) {
+                Uri downloadUri = task.getResult();
+                database.child("events").child(key).child("imgUri").setValue(downloadUri.toString());
+                File file = new File(path);
+                file.delete();
+                dialog.dismiss();
+                loadEventInVisibleMap();
+            }
+        });
+    }
+
+    public static void verifyStoragePermissions(Activity activity){
+        // Check if we have write permission
+        int permission = ActivityCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE);
+
+        if(permission!= PackageManager.PERMISSION_GRANTED){
+            // We don't have permission so prompt the user
+            ActivityCompat.requestPermissions(
+                    activity,
+                    PERMISSIONS_STORAGE,
+                    REQUEST_EXTERNAL_STORAGE
+            );
         }
     }
 }

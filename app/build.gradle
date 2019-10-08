@@ -3,7 +3,7 @@ apply plugin: 'com.android.application'
 android {
     compileSdkVersion 28
     defaultConfig {
-        applicationId "com.laioffer.matrix"
+        applicationId "com.project.ways"
         minSdkVersion 21
         targetSdkVersion 28
         versionCode 1
@@ -26,7 +26,12 @@ dependencies {
     // lib for material library
     implementation 'com.google.android.material:material:1.0.0'
 
+    implementation 'com.google.firebase:firebase-storage:17.0.0'
     implementation 'com.google.firebase:firebase-database:17.0.0'
+    // authentication
+    implementation 'com.google.firebase:firebase-auth:17.0.0'
+
+    //steho
     implementation 'com.facebook.stetho:stetho:1.5.0'
 
     //location
