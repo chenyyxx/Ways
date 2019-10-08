@@ -150,7 +150,7 @@ public class MainFragment extends Fragment implements OnMapReadyCallback, Report
     }
     @Override
     public void onLowMemory() {
-        sup er.onLowMemory();
+        super.onLowMemory();
         mapView.onLowMemory();
     }
 
